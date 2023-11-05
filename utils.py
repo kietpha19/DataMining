@@ -1,5 +1,6 @@
 from googleapiclient.discovery import build
 import pandas as pd
+from datetime import datetime
 
 def get_channel_stats(youtube, channel_ids):
     """
@@ -160,17 +161,24 @@ def get_trending_videos(youtube):
     ).execute()
 
     video_ids = []
+    trending_dates = []
     for video in results['items']:
         video_ids.append(video['id'])
-    
+        trending_dates.append(datetime.today())
+
+    # Convert trending_dates list to a Pandas Series
+    trending_dates_series = pd.Series(trending_dates, name='trending_date')
+
     video_df = pd.DataFrame()
     comments_df = pd.DataFrame()
+
     # get video data
     video_data = get_video_details(youtube, video_ids)
     # get comment data
     comments_data = get_comments_in_videos(youtube, video_ids)
 
-    # Append video data together and comment data together
-    video_df = video_df._append(video_data, ignore_index=True)
-    comments_df = comments_df._append(comments_data, ignore_index=True)
-    return video_df
+    # Append video data and trending_dates together
+    video_df = pd.concat([video_data, trending_dates_series], axis=1)
+    comments_df = comments_data
+
+    return video_df, comments_df
