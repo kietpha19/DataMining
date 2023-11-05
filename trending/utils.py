@@ -76,20 +76,6 @@ def get_video_ids(youtube, playlist_id):
     return video_ids
 
 def get_video_details(youtube, video_ids):
-    """
-    Get video statistics of all videos with given IDs
-    Params:
-    
-    youtube: the build object from googleapiclient.discovery
-    video_ids: list of video IDs
-    
-    Returns:
-    Dataframe with statistics of videos, i.e.:
-        'channelTitle', 'title', 'description', 'tags', 'publishedAt'
-        'viewCount', 'likeCount', 'favoriteCount', 'commentCount'
-        'duration', 'definition', 'caption'
-    """
-        
     all_video_info = []
 
     for i in range(0, len(video_ids), 50):
@@ -97,13 +83,18 @@ def get_video_details(youtube, video_ids):
             part="snippet,contentDetails,statistics",
             id=','.join(video_ids[i:i+50])
         )
-        response = request.execute() 
+        response = request.execute()
 
-        for video in response['items']:
-            stats_to_keep = {'snippet': ['channelTitle', 'title', 'description', 'tags', 'publishedAt'],
-                             'statistics': ['viewCount', 'likeCount', 'favouriteCount', 'commentCount'],
-                             'contentDetails': ['duration', 'definition', 'caption']
-                            }
+        # Fetch video category
+        category_ids = [video['snippet']['categoryId'] for video in response['items']]
+        category_names = get_video_categories(youtube, category_ids)
+
+        for video, category_name in zip(response['items'], category_names):
+            stats_to_keep = {
+                'snippet': ['channelTitle', 'title', 'description', 'tags', 'publishedAt'],
+                'statistics': ['viewCount', 'likeCount', 'favoriteCount', 'commentCount'],
+                'contentDetails': ['duration', 'definition', 'caption'],
+            }
             video_info = {}
             video_info['video_id'] = video['id']
 
@@ -114,9 +105,26 @@ def get_video_details(youtube, video_ids):
                     except:
                         video_info[v] = None
 
+            video_info['category'] = category_name
             all_video_info.append(video_info)
-        
+
     return pd.DataFrame(all_video_info)
+
+def get_video_categories(youtube, category_ids):
+    category_names = []
+
+    for category_id in category_ids:
+        request = youtube.videoCategories().list(
+            part="snippet",
+            id=category_id
+        )
+        response = request.execute()
+        if 'items' in response and response['items']:
+            category_names.append(response['items'][0]['snippet']['title'])
+        else:
+            category_names.append(None)
+
+    return category_names
 
 def get_comments_in_videos(youtube, video_ids):
     """
